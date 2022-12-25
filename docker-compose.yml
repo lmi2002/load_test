@@ -1,0 +1,17 @@
+services:
+  master:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./:/mnt/locust
+      - command: -f /mnt/locust/locustfiles/locustfile.py --master --expect-workers 2
+
+  worker:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./:/mnt/locust
+      - command: -f /mnt/locust/locustfiles/locustfile.py --worker --master-host master
+
