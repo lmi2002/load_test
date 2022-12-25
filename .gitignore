@@ -13,3 +13,4 @@ pytest.xml
 data/
 data_*
 setting_*
+*.conf
