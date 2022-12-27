@@ -1,3 +1,4 @@
+version: "3"
 services:
   master:
     image: locustio/locust
@@ -5,13 +6,11 @@ services:
       - "8089:8089"
     volumes:
       - ./:/mnt/locust
-      - command: -f /mnt/locust/locustfiles/locustfile.py --master --expect-workers 2
+    command: -f /mnt/locust/locustfile.py --master --headless --users 10 --spawn-rate 1 --run-time 60s --expect-workers 5
 
   worker:
     image: locustio/locust
-    ports:
-      - "8089:8089"
     volumes:
       - ./:/mnt/locust
-      - command: -f /mnt/locust/locustfiles/locustfile.py --worker --master-host master
+    command: -f /mnt/locust/locustfile.py --worker --master-host master
 
