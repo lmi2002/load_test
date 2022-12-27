@@ -1,0 +1,16 @@
+--Dockerfile
+To build a docker image:
+cd /path/where/docker_file/lives
+docker build -t name_image -f Dockerfile .
+
+--docker-compose
+https://docs.docker.com/compose/reference/
+https://docs.docker.com/compose/compose-file/#volumes-top-level-element
+
+
+# Запуск docker-compose.yml
+docker compose up --scale worker=5
+# Остановить запущенные контейнеры
+docker compose stop
+# Удалить запущенные контейнеры
+docker compose rm
