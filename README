@@ -14,3 +14,14 @@ docker compose up --scale worker=5
 docker compose stop
 # Удалить запущенные контейнеры
 docker compose rm
+___
+# Запуск используя только сервис locust
+locust -f locustfile.py  --users 20 --spawn-rate 1 --run-time 120s --expect-workers 3
+___
+# Запуск потоками используя только сервис locust (с помощью файлов conf)
+
+# Запуск master (отдельно в терминале)
+locust --config .\locustfiles\master.conf
+
+# Запуск worker (отдельно в терминале)
+locust --config .\locustfiles\worker.conf

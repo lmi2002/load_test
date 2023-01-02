@@ -6,7 +6,7 @@ services:
       - "8089:8089"
     volumes:
       - ./:/mnt/locust
-    command: -f /mnt/locust/locustfile.py --master --headless --users 10 --spawn-rate 1 --run-time 60s --expect-workers 5
+    command: -f /mnt/locust/locustfile.py --master --headless --users 20 --spawn-rate 1 --run-time 60s --expect-workers 5
 
   worker:
     image: locustio/locust

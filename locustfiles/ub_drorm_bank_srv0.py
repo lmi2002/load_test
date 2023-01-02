@@ -9,11 +9,12 @@ from data_pers_name_drorm import pers_name
 
 
 class DrormBankUser_Srv0(FastHttpUser):
-    class_name = __qualname__.split('_')[0]
-    wait_time = setting_user.users.get(class_name).get('wait_time')
-    host = setting_user.users.get(class_name).get('host')
-    # fixed_count = setting_user.users.get(class_name).get('fixed_count')
-    shw = setting_header.SettingHeadersWeb(class_name)
+    class_name = __qualname__
+    class_name_user = __qualname__.split('_')[0]
+    wait_time = setting_user.users.get(class_name_user).get('wait_time')
+    host = setting_user.users.get(class_name_user).get('host')
+    # fixed_count = setting_user.users.get(class_name_user).get('fixed_count')
+    shw = setting_header.SettingHeadersWeb(class_name_user)
     headers = shw.headers
     sbj_pers_name_list = pers_name
 
