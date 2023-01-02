@@ -13,12 +13,12 @@ from data_rpvn_drrp import rpvn_num
 from func import get_text_from_file, get_now_strftime
 
 
-class DrrpNotarUser_Srv0(FastHttpUser):
+class DrrpNotarUser_Srv1(FastHttpUser):
     class_name = __qualname__
     class_name_user = __qualname__.split('_')[0]
     wait_time = setting_user.users.get(class_name_user).get('wait_time')
     # fixed_count = setting_user.users.get(class_name_user).get('fixed_count')
-    host = 'https://ub-srv-42.test.nais.gov.ua'
+    host = 'https://ub-srv-41.test.nais.gov.ua'
     shw = setting_header.SettingHeadersWeb(class_name_user)
     headers = shw.headers
     headers['authorization'] = 'UB 3de9aeba63b2fa896801c285'

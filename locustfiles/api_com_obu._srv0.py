@@ -10,11 +10,12 @@ from data_pers_code_drrp import pers_code
 
 
 class ObuApiUser_Srv0(FastHttpUser):
-    class_name = __qualname__.split('_')[0]
-    wait_time = setting_user.users.get(class_name).get('wait_time')
-    host = setting_user.users.get(class_name).get('host')
-    # fixed_count = setting_user.users.get(class_name).get('fixed_count')
-    sha = setting_header.SettingHeadersApi(class_name)
+    class_name = __qualname__
+    class_name_user = __qualname__.split('_')[0]
+    wait_time = setting_user.users.get(class_name_user).get('wait_time')
+    host = setting_user.users.get(class_name_user).get('host')
+    # fixed_count = setting_user.users.get(class_name_user).get('fixed_count')
+    sha = setting_header.SettingHeadersApi(class_name_user)
     headers = sha.headers
     sbj_pers_code_list = pers_code
 

@@ -12,13 +12,14 @@ from func import get_now_strftime
 
 
 class DrormAdminUser_Srv0(FastHttpUser):
-    class_name = __qualname__.split('_')[0]
-    wait_time = setting_user.users.get(class_name).get('wait_time')
-    host = setting_user.users.get(class_name).get('host')
-    # fixed_count = setting_user.users.get(class_name).get('fixed_count')
-    shw = setting_header.SettingHeadersWeb(class_name)
+    class_name = __qualname__
+    class_name_user = __qualname__.split('_')[0]
+    wait_time = setting_user.users.get(class_name_user).get('wait_time')
+    host = setting_user.users.get(class_name_user).get('host')
+    # fixed_count = setting_user.users.get(class_name_user).get('fixed_count')
+    shw = setting_header.SettingHeadersWeb(class_name_user)
     headers = shw.headers
-    serial = setting_user.users.get(class_name).get('serial')
+    serial = setting_user.users.get(class_name_user).get('serial')
     sbj_pers_code_list = pers_code
     sbj_comp_code_list = comp_code
 
