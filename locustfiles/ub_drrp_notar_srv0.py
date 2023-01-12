@@ -1,16 +1,19 @@
 import json
 import os
 import random
-import sys
 
-from locust import task, FastHttpUser, constant_pacing
+from locust import task, FastHttpUser
 
 import setting_user
 import setting_header
+from data_atu_atu import atu_atu_locality, atu_atu_object, atu_atu_street, atu_region
 from data_onm_drrp import onm_num
+from data_erk_ import erc_employee, erc_object_atu, erc_objects_names_atu
 from data_property_drrp import pr_num
 from data_rpvn_drrp import rpvn_num
-from func import get_text_from_file, get_now_strftime
+from data_rrp_core_dict_enum import rrp_core_dict_enum
+from func import get_text_from_file, get_now_strftime, get_date_strftime
+from data_comp_code import comp_code
 
 
 class DrrpNotarUser_Srv0(FastHttpUser):
@@ -18,17 +21,18 @@ class DrrpNotarUser_Srv0(FastHttpUser):
     class_name_user = __qualname__.split('_')[0]
     wait_time = setting_user.users.get(class_name_user).get('wait_time')
     # fixed_count = setting_user.users.get(class_name_user).get('fixed_count')
-    host = 'https://ub-srv-42.test.nais.gov.ua'
+    host = 'https://ub-srv-51.test.nais.gov.ua'
     shw = setting_header.SettingHeadersWeb(class_name_user)
     headers = shw.headers
-    headers['authorization'] = 'UB 3de9aeba63b2fa896801c285'
+    headers['authorization'] = 'UB e646b2ef63b742a189c03944'
     serial = setting_user.users.get(class_name_user).get('serial')
     onm_num_list = onm_num
     rpvn_num_list = rpvn_num
     pr_num_list = pr_num
+    sbj_comp_code_list = comp_code
 
     # Обмін с ДЗК
-    # @task(40)
+    @task(4)
     def exchange_dzk(self):
         data_dzk = [
             {
@@ -38,10 +42,10 @@ class DrrpNotarUser_Srv0(FastHttpUser):
             }
         ]
 
-        self.client.post("/ubql", name= self.class_name + " (DRRP)1-obmіn dzk", headers=self.headers, json=data_dzk)
+        self.client.post("/ubql", name=self.class_name + " (DRRP)1-obmіn dzk", headers=self.headers, json=data_dzk)
 
     # Обмін с ДСП
-    # @task(40)
+    @task(4)
     def exchange_dps_rnokpp(self):
         data_dps_rnokpp = [
             {
@@ -56,10 +60,11 @@ class DrrpNotarUser_Srv0(FastHttpUser):
             }
         ]
 
-        self.client.post("/ubql", name=self.class_name + " (DRRP)1-obmіn dps rnokpp", headers=self.headers, json=data_dps_rnokpp)
+        self.client.post("/ubql", name=self.class_name + " (DRRP)1-obmіn dps rnokpp", headers=self.headers,
+                         json=data_dps_rnokpp)
 
     # Обмін с ЄДЕССБ
-    # @task(40)
+    @task(4)
     def exchange_edesssb(self):
         data_edesssb = [
             {
@@ -71,7 +76,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
         ]
 
         response_get_edesssb = self.client.post(
-            "/ubql", name=self.class_name + " (DRRP)1-obmin edessb (tex nomer edessb)", headers=self.headers, json=data_edesssb)
+            "/ubql", name=self.class_name + " (DRRP)1-obmin edessb (tex nomer edessb)", headers=self.headers,
+            json=data_edesssb)
 
         document = response_get_edesssb.json()[0].get('document')
         orig_name = json.loads(document).get('storeItemMetadata').get('origName')
@@ -87,7 +93,7 @@ class DrrpNotarUser_Srv0(FastHttpUser):
         #                 debug_stream=sys.stderr)
 
     # Перевірка ОНМ
-    # @task(70)
+    @task(6)
     def get_reg_num_onm(self):
         onm_num = random.choice(self.onm_num_list)
         data_reg_num_onm = [
@@ -107,7 +113,7 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                          json=data_reg_num_onm)
 
     # Перевірка ПВ
-    # @task(70)
+    @task(6)
     def get_num_property(self):
         pr_num = random.choice(self.pr_num_list)
         data_num_property = [
@@ -129,7 +135,7 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                          json=data_num_property)
 
     # Обмін с ДСА
-    # @task(40)
+    @task(6)
     def exchange_dsa(self):
         data_dsa = [
             {
@@ -149,7 +155,7 @@ class DrrpNotarUser_Srv0(FastHttpUser):
         self.client.post("ubql=", name=self.class_name + " (DRRP)1-obmin dsa", headers=self.headers, json=data_dsa)
 
     # Перевірка РПВН
-    # @task(70)
+    @task(6)
     def get_rpvn(self):
         rpvn_num = random.choice(self.rpvn_num_list)
         data_rpvn = [
@@ -161,7 +167,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                 }
             }
         ]
-        self.client.post("/ubql", name=self.class_name + " (DRRP)1-perevirka rpvn u pravi vlastnosti", headers=self.headers,
+        self.client.post("/ubql", name=self.class_name + " (DRRP)1-perevirka rpvn u pravi vlastnosti",
+                         headers=self.headers,
                          json=data_rpvn)
 
     # Реєстраційні дії користувача
@@ -236,6 +243,42 @@ class DrrpNotarUser_Srv0(FastHttpUser):
         instance = response_select_st.json()[0].get('instance')
         last_op_id = json.loads(instance).get('lastOpID')
 
+        # Валідація заяви у рішенні
+        data_select_decision_reason = [
+            {
+                "entity": "rrpUb_decisionCard",
+                "method": "selectDecisionReason",
+                "instance": {
+                    "regNum": str(rn_num),
+                    "acName": "o_reg",
+                    "entityRnNum": None,
+                    "limitationID": None,
+                    "options": {
+                        "isBond": False
+                    }
+                },
+                "formShortcutCode": "NOTAR_RRP_REALTY_CREATE",
+                "privCode": "NOTAR_DECISION_OPERATIONS_VIEW"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)2-validatsiya zayavi v rishenni(selectDecisionReason)",
+                         headers=self.headers,
+                         json=data_select_decision_reason)
+
+        # Додавання інформації з заяви у рішення
+        data_select_for_section = [
+            {
+                "entity": "rrpUb_requestCard",
+                "method": "selectForSection",
+                "privCode": "NOTAR_REQUEST_OPERATIONS_VIEW",
+                "rnNum": str(rn_num)
+            }
+        ]
+        self.client.post("/ubql",
+                         name=self.class_name + " (DRRP)2-dodavannya info z zayavi v rishenni(selectForSection)",
+                         headers=self.headers,
+                         json=data_select_for_section)
+
         # Реєстрація рішення
         data_check_st_in_decision = [
             {
@@ -304,6 +347,30 @@ class DrrpNotarUser_Srv0(FastHttpUser):
         self.client.post("/ubql", name=self.class_name + " (DRRP)2-pidpisannya DF rishennya", headers=self.headers,
                          json=data_sign_pdf_ds_card)
 
+        # Додовання у рішення дату повідомлення про зупинення розгляду
+        data_ds_perform_action = [
+            {
+                "entity": "rrpUb_decisionCard",
+                "method": "performAction",
+                "decision": {
+                    "rnNum": str(ds_rn_num),
+                    "receiveDate": "2023-01-06T00:00:00.000Z"
+                },
+                "operation": {
+                    "acName": "d_mkdt"
+                },
+                "privCode": "NOTAR_DECISION_OPERATIONS_EDIT_DATE"
+            }
+        ]
+        self.client.post("/ubql",
+                         name=self.class_name + " (DRRP)2-dodavannya v rishennya datu pro zupinennya(performAction)",
+                         headers=self.headers,
+                         json=data_ds_perform_action)
+
+        # Відкриття вкладки розділа
+        self.client.post("/ubql", name=self.class_name + " (DRRP)2-vidkrittya vkladki rozdila", headers=self.headers,
+                         json=atu_region)
+
         # Реєстрація розділа
         data_create_onm = [
             {
@@ -319,7 +386,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
             }
         ]
 
-        create_onm = self.client.post("/ubql", name=self.class_name + " (DRRP)2-stvorennya rozdilu", headers=self.headers,
+        create_onm = self.client.post("/ubql", name=self.class_name + " (DRRP)2-stvorennya rozdilu",
+                                      headers=self.headers,
                                       json=data_create_onm)
         ml_id = create_onm.json()[0].get('message').get('mlID')
 
@@ -338,7 +406,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
             }
         ]
 
-        create_onm_perform = self.client.post("/ubql", name=self.class_name + " (DRRP)2-pidtverdjennya stvorennya rozdilu",
+        create_onm_perform = self.client.post("/ubql",
+                                              name=self.class_name + " (DRRP)2-pidtverdjennya stvorennya rozdilu",
                                               headers=self.headers,
                                               json=data_create_onm_perform)
 
@@ -377,7 +446,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                 "privPrefix": "NOTAR"
             }
         ]
-        self.client.post("/ubql", name=self.class_name + " (DRRP)3-poshuk zayav za period", headers=self.headers, json=data_date)
+        self.client.post("/ubql", name=self.class_name + " (DRRP)3-poshuk zayav za period", headers=self.headers,
+                         json=data_date)
 
     # Пошук рішень
     @task(6)
@@ -424,7 +494,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                 ]
             }
         ]
-        self.client.post("/ubql", name=self.class_name + " (DRRP)4-poshuk rishen za period(results)", headers=self.headers,
+        self.client.post("/ubql", name=self.class_name + " (DRRP)4-poshuk rishen za period(results)",
+                         headers=self.headers,
                          json=data_search_result)
 
     # Черга заяв
@@ -481,7 +552,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
             }
         ]
         response_generate_pdf = \
-            self.client.post("/ubql", name=self.class_name + " (DRRP)6-poshuk zayav v BD (gener PDF)", headers=self.headers,
+            self.client.post("/ubql", name=self.class_name + " (DRRP)6-poshuk zayav v BD (gener PDF)",
+                             headers=self.headers,
                              json=data_generate_pdf).json()[0]
         report_result_id = response_generate_pdf.get('reportResultID')
 
@@ -502,7 +574,7 @@ class DrrpNotarUser_Srv0(FastHttpUser):
     # Створення відомості з відкладенним формуванням
     @task(1)
     def vidomosti_za_rezult_poshuku_scheduler(self):
-        # Створення Заява про надання інформації (інформація)
+        # Реєстрація Заява про надання інформації (інформація)
         data_create_st_card = [
             {
                 "entity": "rrpUb_requestCard",
@@ -608,13 +680,14 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                 }
             }
         ]
-        self.client.post("/ubql", name=self.class_name + " (DRRP)7-vidomosti za rezult poshuku (scheduler)", headers=self.headers,
+        self.client.post("/ubql", name=self.class_name + " (DRRP)7-vidomosti za rezult poshuku (scheduler)",
+                         headers=self.headers,
                          json=data_search)
 
     # Створення відомості
     @task(3)
     def vidomosti_za_rezult_poshuku(self):
-        # Створення Заява про надання інформації (інформація)
+        # Реєстрація Заява про надання інформації (інформація)
         data_create_st_card = [
             {
                 "entity": "rrpUb_requestCard",
@@ -670,6 +743,22 @@ class DrrpNotarUser_Srv0(FastHttpUser):
         # self.client.get("/getDocument", name=self.class_name + " (DRRP)vidkrittaya DF zayavi", headers=self.headers,
         #                 params=data_get_doc_st_pdf, debug_stream=sys.stderr)
 
+        # Перевірка заяви на валідність
+        data_get_request_short_info = [
+            {
+                "entity": "rrpUb_request",
+                "method": "getRequestShortInfo",
+                "privCode": "NOTAR_REQUEST_OPERATIONS_VIEW",
+                "queryParameters": {
+                    "rnNum": str(rn_num),
+                    "actionName": "consolidatedExtract"
+                }
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)perevirka zayavi validatsiya(getRequestShortInfo)",
+                         headers=self.headers,
+                         json=data_get_request_short_info)
+
         # Пошук (суб'єкт декілька об'єктів)
         data_search = [
             {
@@ -720,7 +809,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
             }
         ]
         response_search = \
-            self.client.post("/ubql", name=self.class_name + " (DRRP)8-vidomosti za rezult poshuku", headers=self.headers,
+            self.client.post("/ubql", name=self.class_name + " (DRRP)8-vidomosti za rezult poshuku",
+                             headers=self.headers,
                              json=data_search).json()[0]
         search_info = json.loads(response_search.get('resultData')).get('searchInfo')
         report_result_temp_id = search_info.get('reportResultTempID')
@@ -805,7 +895,7 @@ class DrrpNotarUser_Srv0(FastHttpUser):
     # Створення виписка
     @task(1)
     def create_vipiska(self):
-        # Створення Заява про надання інформації (виписка)
+        # Реєстрація Заява про надання інформації (виписка)
         data_create_st_card = [
             {
                 "entity": "rrpUb_requestCard",
@@ -882,8 +972,9 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                 }
             }
         ]
-        response_search = self.client.post("/ubql", name=self.class_name + " (DRRP)9-poshuk vipiska", headers=self.headers,
-                                           json=data_search).json()[0]
+        response_search = \
+            self.client.post("/ubql", name=self.class_name + " (DRRP)9-poshuk vipiska", headers=self.headers,
+                             json=data_search).json()[0]
         report_result_temp_id = json.loads(response_search.get('resultData')).get('reportResultTempID')
 
         data_generate_pdf_vipiska = [
@@ -954,8 +1045,9 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                 }
             }
         ]
-        response_search = self.client.post("/ubql", name=self.class_name + " (DRRP)10-poshuk vityag", headers=self.headers,
-                                           json=data_search).json()[0]
+        response_search = \
+            self.client.post("/ubql", name=self.class_name + " (DRRP)10-poshuk vityag", headers=self.headers,
+                             json=data_search).json()[0]
         search_info = json.loads(response_search.get('resultData')).get('searchInfo')
         report_result_temp_id = search_info.get('reportResultTempID')
         search_id = search_info.get('searchID')
@@ -1041,7 +1133,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
             }
         ]
         response_generate = \
-            self.client.post("/ubql", name=self.class_name + " (DRRP)12-Infospravka poshuk po sbj", headers=self.headers,
+            self.client.post("/ubql", name=self.class_name + " (DRRP)12-Infospravka poshuk po sbj",
+                             headers=self.headers,
                              json=data_generate).json()[0]
         result_data = json.loads(response_generate.get('resultData'))
         report_result_id = result_data.get('reportResultID')
@@ -1057,7 +1150,8 @@ class DrrpNotarUser_Srv0(FastHttpUser):
             }
         ]
         response_generate_pdf = \
-            self.client.post("/ubql", name=self.class_name + " (DRRP)12-stvorennya DF infospravki", headers=self.headers,
+            self.client.post("/ubql", name=self.class_name + " (DRRP)12-stvorennya DF infospravki",
+                             headers=self.headers,
                              json=data_generate_pdf).json()[0]
         report_result_id_generate_pdf = response_generate_pdf.get('reportResultID')
 
@@ -1099,4 +1193,494 @@ class DrrpNotarUser_Srv0(FastHttpUser):
                 }
             }
         ]
-        self.client.post("/ubql", name=self.class_name + " (DRRP)infospravka (scheduler)", headers=self.headers, json=data_save_queue_task)
+        self.client.post("/ubql", name=self.class_name + " (DRRP)infospravka (scheduler)", headers=self.headers,
+                         json=data_save_queue_task)
+
+    # Додано 2 метода erc_employee та erc_object_atu. Методи додають атрибути у форми при відкритті.
+    # Приклад на форму відкриття заяви
+    @task(10)
+    def open_tag(self):
+        # Відкриття вкладки
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Vidkrittya vklsdki(erc_employee)",
+                         headers=self.headers,
+                         json=erc_employee)
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Vidkrittya vklsdki(erc_object_atu)",
+                         headers=self.headers,
+                         json=erc_object_atu)
+
+    @task(5)
+    def get_data_from_atu(self):
+        # Отримання даних АТУ
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Otrimannya danih atu(atu_atu_locality)",
+                         headers=self.headers,
+                         json=atu_atu_locality)
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Otrimannya danih atu(atu_atu_object)",
+                         headers=self.headers,
+                         json=atu_atu_object)
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Otrimannya danih atu(atu_atu_street)",
+                         headers=self.headers,
+                         json=atu_atu_street)
+
+    @task
+    def search_info_to_2013(self):
+        # Пошук архівних записів
+        data = [
+            {
+                "entity": "rrpOld_search",
+                "method": "search",
+                "searchParams": {
+                    "objectSearchInfo": {
+                        "realtyAddressInfo": {
+                            "streetAtuId": 331537,
+                            "localityAtuId": "26",
+                            "houseType": "1",
+                            "house": "23",
+                            "isReAddressOnly": None,
+                            "isRepAddressOnly": None
+                        }
+                    },
+                    "searchBy": "1",
+                    "dcSearchRegistryTypes": "2"
+                },
+                "privPrefix": "NOTAR"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)poshuk arhiv zapisiv(rrpOld_search)",
+                         headers=self.headers,
+                         json=data)
+
+    @task
+    def transfer_of_rights_to_process(self):
+        # Передача прав на обробку заяв та запитів
+        # Реєстрація заяви ПВ
+        data_create_st_card = json.loads(
+            get_text_from_file(os.path.abspath('./data/data_create_st_card.txt')))
+        response_create_st_card = self.client.post("/ubql", name=self.class_name + " (DRRP)stvorennya zayavi",
+                                                   headers=self.headers,
+                                                   json=data_create_st_card)
+        rn_num = response_create_st_card.json()[0].get('rnNum')
+        id = response_create_st_card.json()[0].get('ID')
+
+        data_generate_pdf_st_card = [
+            {
+                "entity": "rrpUb_requestSearch",
+                "method": "generatePdf",
+                "requestInfoRecord": "{\"ID\":" + str(id) + ",\"reqReqID\":null,\"rnNum\":" + str(
+                    rn_num) + ",\"dcReqState\":\"6\",\"holderObjID\":22061,\"holderObjnID\":4367,\"reqTypeExtension\":null,\"signDate\":null,\"outNum\":\"1\",\"senderEmpID\":null,\"formatVersion\":2,\"receiverObjID\":null,\"receiverObjnID\":null,\"regDate\":\"2022-11-23T23:22:37Z\",\"reqCode\":null,\"additional\":\"API\",\"senderObjID\":null,\"senderObjnID\":null,\"createDate\":null,\"receiverAtuID\":null,\"dcReqType\":\"19\",\"dcReqRegType\":\"1\",\"regNum\":\"51230684\",\"isActual\":\"1\",\"senderAtuID\":null,\"dcReqSort\":\"2\",\"holderAtuID\":10,\"dcDocReceiveType\":null,\"outDate\":\"2022-11-22T00:00:00Z\",\"rrbRrbID\":58601996,\"sendDate\":null,\"transferDate\":null,\"mi_wfState\":\"6\",\"dcDocGiveType\":\"1\",\"isReducedTerm\":null,\"dcExtReceiveType\":\"2\",\"extEmail\":null,\"dcTermReview\":\"7200\",\"dcApproveState\":4,\"termReviewDate\":\"2022-11-28T23:22:00Z\",\"body\":{\"ID\":58601996,\"isPrLimited\":null,\"rbDescription\":null,\"enum\":null,\"enumIrp\":null,\"enumPr\":null,\"dcDocTypeInfo\":null,\"entityLastOpID\":null,\"dcPrCommonKind\":null,\"lmTypeExtension\":null,\"decEnum\":null,\"enumReq\":null,\"dcReqDocType\":null,\"descriptionLmObject\":null,\"dcPrType\":null,\"additional\":null,\"changesDescription\":null,\"dcRecType\":null,\"rnNumBrealty\":null,\"irpPrTypeExtension\":null,\"isUndefined\":null,\"dcCourtDecision\":null,\"isExtractNeed\":null,\"dcCancelKind\":null,\"enumRealty\":null,\"dcDocReqType\":null,\"rnNumRealty\":null,\"dcIrpSortReq\":null,\"dcLmType\":null,\"dcEnumType\":null,\"series\":null,\"num\":null,\"enumBrealty\":null,\"dcEntityChangeTypeBit\":\"x000001\",\"isOwner\":null,\"dcReqTypeSubject\":null,\"startDate\":null,\"finishDate\":null,\"cadNum\":null,\"dcPrKind\":\"1\",\"dcEasementType\":null,\"easementTypeExtension\":null,\"isContractEmphyteutist\":null,\"dcSearchType\":null,\"dcErrorType\":null,\"dcRecTypeLnkTo\":null,\"entityChangeTypeBit\":\"набуття\",\"docTypeInfo\":\"<не вказано>\",\"prKind\":\"право власності\"},\"subjects\":[{\"ID\":104966297,\"rsbjRsbjID\":null,\"reqReqID\":60885663,\"sbjAdPostalID\":null,\"sbjAdLocationID\":null,\"cdCdID\":null,\"rnRnID\":13134294,\"sbjName\":\"КІЛЮХ РАНІЛЬ ЄСЕЙОВИЧ\",\"sbjCode\":\"2564489755\",\"dcCodeAbsenceBit\":null,\"dcSbjType\":\"1\",\"isState\":null,\"dcSbjRlNameBit\":\"x11\",\"dcChangeType\":\"2\",\"additional\":null,\"rnNum\":104966297,\"rSubjectRsbjID\":null,\"dcEntityClass\":\"1\",\"reqRnNum\":51230684,\"dcSbjSort\":\"1\",\"dcCountry\":\"225\",\"phone\":null,\"dcSbjAddType\":null,\"sbjPos\":null,\"idEddr\":null,\"isValidated\":1,\"isDmsValidated\":0,\"isNotResident\":null,\"reasonAbsentValidate\":null,\"surname\":\"КІЛЮХ\",\"firstName\":\"РАНІЛЬ\",\"patronymic\":\"ЄСЕЙОВИЧ\",\"taxNumber\":null,\"phoneNumber\":null,\"email\":null,\"isLocalGovernment\":null,\"sbjRlName\":\"Заявник; Суб’єкт права\",\"sbjType\":\"фізична особа\",\"country\":\"Україна\"}],\"realties\":[{\"ID\":54020835,\"rreRreID\":null,\"reqReqID\":60885663,\"reSubTypeExtension\":null,\"sbjCode\":null,\"sbjName\":null,\"enum\":null,\"dcChangeType\":\"2\",\"dcReType\":\"1\",\"dcReTypeOnm\":\"1\",\"description\":null,\"reqRnNum\":51230684,\"isFewAreaLoc\":null,\"sbjRegDate\":null,\"reTypeExtension\":null,\"dcReSubType\":null,\"renRenID\":null,\"rnNum\":54020835,\"dcIrpSpread\":null,\"enumSPart\":null,\"enumSubPart\":null,\"enumEmph\":null,\"objectIdentifier\":null,\"reExtension\":null,\"addresses\":[{\"ID\":39785395,\"rreRreID\":54020835,\"rrpRrpID\":null,\"atuAtuID\":null,\"house\":null,\"building\":null,\"objectNum\":null,\"rrpRnNum\":null,\"houseHash1\":null,\"houseHash2\":null,\"roomHash1\":null,\"additional\":null,\"dcObjectNumType\":null,\"room\":null,\"isNotFull\":null,\"dcReOwnerKind\":\"1\",\"simpleAddress\":null,\"isSimpleAddress\":\"0\",\"objectNumHash1\":null,\"objectNumHash2\":null,\"roomHash2\":null,\"dcHouseType\":null,\"dcRoomType\":null,\"groupNum\":1,\"buildingHash2\":null,\"dcBuildingType\":null,\"buildingHash1\":null,\"addressInfo\":\"\"}],\"cadNums\":[{\"ID\":36556042,\"rrpRrpID\":null,\"rreRreID\":54020835,\"enum\":\"8000000000:85:289:0006\",\"rrpRnNum\":null,\"cadNumHash\":\"8000000000852890006\"}],\"reType\":\"земельна ділянка\",\"reTypeOnm\":\"земельна ділянка\"}],\"paymentDocuments\":[{\"ID\":102820242,\"rpdRpdID\":null,\"reqReqID\":60885663,\"enum\":\"22\",\"pdType\":null,\"dcPayType\":\"5\",\"summ\":100,\"dcChangeType\":\"2\",\"dcPdReasonType\":null,\"rnNum\":102820242,\"additional\":null,\"reqRnNum\":51230684,\"orgName\":\"банк\",\"dcPdKind\":\"1\",\"rpdDate\":\"2022-11-23T00:00:00Z\",\"pdReasonTypeExtension\":null,\"reportResultID\":null,\"receiptNum\":null,\"payType\":\"Адміністративний збір за реєстраційні дії\"}],\"causeDocuments\":[{\"ID\":338459458,\"cdCdID\":null,\"dcCdSort\":\"1\",\"dcCdType\":\"108\",\"publisher\":\"Державний земельний кадастр\",\"enum\":\"55241333\",\"dcCdReasonType\":null,\"attrReqRnNum\":null,\"rceRnNum\":null,\"baseCdID\":null,\"ropRopID\":null,\"lmLmID\":null,\"mgMgID\":null,\"irpIrpID\":null,\"dcChangeType\":\"2\",\"bnRnNum\":null,\"baseRnNum\":null,\"prRnNum\":null,\"docTypeUser\":null,\"additional\":null,\"reqReqID\":60885663,\"rnNum\":338459458,\"lmRnNum\":null,\"dcCdKind\":\"12\",\"dcEntityClass\":\"1\",\"cdTypeExtension\":null,\"cdReasonTypeExtension\":null,\"rceRceID\":null,\"attrReqID\":null,\"reqRnNum\":51230684,\"irpRnNum\":null,\"bnBnID\":null,\"docDate\":\"2022-11-23T00:00:00Z\",\"expirationDate\":null,\"opOpID\":null,\"reReID\":null,\"mgRnNum\":null,\"breRnNum\":null,\"oedOedID\":null,\"reRnNum\":null,\"prPrID\":null,\"breBreID\":null,\"documentID\":355127189,\"cdType\":\"відомості з ДЗК\",\"pagesCount\":1,\"sortOrder\":355127189,\"uploadedPages\":1,\"countPages\":null,\"deliveryDate\":null,\"rercRercID\":null,\"pageFiles\":[{\"ID\":228952387,\"documentID\":355127189,\"pageNumber\":1,\"cdID\":338459458,\"empEmpID\":25213,\"dcCdType\":\"108\",\"addedDate\":\"2022-11-23T23:22:37Z\",\"signature\":\"{\\\"v\\\":1,\\\"store\\\":\\\"causeDocumentFiles\\\",\\\"fName\\\":\\\"16419913.p7s\\\",\\\"origName\\\":\\\"16419913.p7s\\\",\\\"relPath\\\":\\\"202211/23\\\",\\\"ct\\\":\\\"application/pkcs7-signature\\\",\\\"size\\\":3782,\\\"md5\\\":\\\"6796e4a412fb99a266b0eb1212c12a1e\\\",\\\"revision\\\":1}\",\"generatedDocument\":\"{\\\"v\\\":1,\\\"store\\\":\\\"causeDocumentFiles\\\",\\\"fName\\\":\\\"no-file-name.bin\\\",\\\"origName\\\":\\\"no-file-name.bin\\\",\\\"relPath\\\":\\\"202211/23\\\",\\\"ct\\\":\\\"application/octet-stream\\\",\\\"size\\\":54327,\\\"md5\\\":\\\"f2a2cd35936b5c29dcba9a24f7363d6b\\\",\\\"revision\\\":1}\"}],\"isDabiEcd\":true}],\"dzk\":[{\"ID\":18719019,\"areaUnit\":\"га\",\"dcAreaUnit\":null,\"techDoc\":\"Проект землеустрою щодо відведення земельних ділянок, 26.05.2008\",\"ownershipForm\":\"Комунальна власність\",\"cadNum\":\"8000000000:85:289:0006\",\"purpose\":\"Для розміщення та експлуатації основних, підсобних і допоміжних будівель та споруд підприємств переробної, машинобудівної та іншої промисловості\",\"regDate\":\"2008-05-30T00:00:00Z\",\"reqReqID\":60885663,\"state\":\"зареєстровано\",\"orgName\":\"Головне управління земельних ресурсів виконавчого органу Київради (Київської міської державної адміністрації)\",\"area\":\"1.4415\",\"purposeCode\":\"11.02\",\"cdCdID\":338459458,\"ddpfDdpfID\":228952387,\"address\":[{\"ID\":18565699,\"building\":\"40\",\"block\":null,\"rdzkRdzkID\":18719019,\"streetName\":\"вул. Фрунзе\",\"region\":\"м. Київ\",\"settlement\":null,\"streetType\":null,\"additionalInfoBlock\":null,\"district\":\"м. Київ\"}],\"subject\":[{\"ID\":22044813,\"sbjCode\":\"22883141\",\"name\":null,\"docReasonCompany\":null,\"docRightNumber\":null,\"rdzkRdzkID\":18719019,\"type\":\"юридична особа\",\"docRightType\":null,\"part\":\"1/1\",\"docRightDate\":null,\"passport\":null,\"docReasonNumber\":null,\"legalMode\":\"Право власності\",\"docReasonType\":null,\"servitudeMode\":null,\"irpDate\":null,\"irpTerm\":null,\"irpArea\":null,\"docRightCompany\":null,\"docReasonDate\":null}]}],\"holder\":{\"empEmpID\":25213,\"objObjID\":22061,\"objObjnID\":4367,\"atuAtuID\":10,\"objectName\":\"Києво-Святошинська районна державна нотаріальна контора\",\"objectNameHist\":\"Києво-Святошинська районна державна нотаріальна контора\",\"atuName\":\"Київська обл.\",\"notaryDepName\":\"Фастівський районний нотаріальний округ\"},\"reqState\":\"зареєстровано\",\"lastOpID\":168554009,\"registrarEmpID\":25213,\"registrarEmployeeName\":\"Панікар Валентина Миколаївна\",\"registrarAtuID\":10,\"registrarAtuName\":\"Київська обл.\",\"registrarObjID\":22061,\"registrarObjectName\":\"Києво-Святошинська районна державна нотаріальна контора\",\"registrarObjnID\":4367,\"registrarObjectNameHist\":\"Києво-Святошинська районна державна нотаріальна контора\",\"registrarInfo\":\"<b>Панікар Валентина Миколаївна</b>, Києво-Святошинська районна державна нотаріальна контора, Київська обл.\",\"registrarInfoExists\":true,\"reqType\":\"заява про державну реєстрацію прав\",\"reqSort\":\"паперова\",\"docGiveType\":\"особисто\",\"extReceiveType\":\"у паперовому вигляді\",\"holderEmpID\":25213,\"holderEmployeeName\":\"Панікар Валентина Миколаївна\",\"holderObjectName\":\"Києво-Святошинська районна державна нотаріальна контора\",\"holderObjectNameHist\":\"Києво-Святошинська районна державна нотаріальна контора\",\"holderAtuName\":\"Київська обл.\",\"operations\":[{\"ID\":168554009,\"dcOpType\":\"1\",\"opDate\":\"2022-11-23T23:22:37Z\",\"empEmpID\":25213,\"objObjID\":22061,\"objObjnID\":4367,\"atuAtuID\":10,\"dcOpReasonType\":null,\"opReasonTypeExtension\":null,\"opReason\":null,\"additional\":null,\"registrarEmpID\":25213,\"registrarObjID\":22061,\"registrarObjnID\":4367,\"registrarAtuID\":10,\"dcEntityClass\":\"1\",\"isLastOp\":\"1\",\"dsRnNum\":null,\"toHID\":130781310,\"reasonDsRnNum\":null,\"cancelRopID\":null,\"objectName\":\"Києво-Святошинська районна державна нотаріальна контора\",\"registrarObjectName\":\"Києво-Святошинська районна державна нотаріальна контора\",\"objectNameHist\":\"Києво-Святошинська районна державна нотаріальна контора\",\"registrarObjectNameHist\":\"Києво-Святошинська районна державна нотаріальна контора\",\"opType\":\"Реєстрація заяви\",\"employeeName\":\"Панікар Валентина Миколаївна\",\"registrarEmployeeName\":\"Панікар Валентина Миколаївна\",\"atuName\":\"Київська обл.\",\"registrarAtuName\":\"Київська обл.\",\"entityClass\":\"заява\"}],\"decisionsAndDocs\":[],\"colorClass\":\"#ffd000\",\"isExistsPrintDoc\":0}",
+                "repReportResultID": None,
+                "isAllowAnnullate": False,
+                "privPrefix": "NOTAR",
+                "operation": "RequestPdf"
+            }
+        ]
+
+        response_generate_pdf_st_card = self.client.post("/ubql", name=self.class_name + " (DRRP)stvorennya DF zayavi",
+                                                         headers=self.headers,
+                                                         json=data_generate_pdf_st_card)
+        report_result_id_generate_st_pdf = response_generate_pdf_st_card.json()[0].get('reportResultID')
+
+        data_get_doc_st_pdf = {
+            "entity": "rep_reportResult",
+            "attribute": "generatedDocument",
+            "ID": report_result_id_generate_st_pdf,
+            "store": "reportsLU",
+            "origName": '{report_result_id}{pdf}'.format(report_result_id=str(report_result_id_generate_st_pdf),
+                                                         pdf='.pdf'),
+            "filename": 'rep_reportResult{report_result_id}generatedDocument'.format(
+                report_result_id=str(report_result_id_generate_st_pdf)),
+            "_rc": 1
+        }
+        # self.client.get("/getDocument", name=self.class_name + " (DRRP)vidkrittya DF zayavi", headers=self.headers,
+        #                 params=data_get_doc_st_pdf)
+
+        # Відкриття вкладки Передача прав на обробку заяв та запитів
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Vidkrittya peredacha prav na obrobotru",
+                         headers=self.headers,
+                         json=erc_objects_names_atu)
+
+        # Передача прав на обробку заяв та запитів
+        data = [
+            {
+                "entity": "rrpUb_requestCard",
+                "method": "transferRights",
+                "instance": "{\"requests\":[" + str(
+                    rn_num) + "],\"opReason\":\"Автотест\",\"atuAtuID\":2,\"objectID\":20793}"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Peredacha prav na obrobotru",
+                         headers=self.headers,
+                         json=data)
+
+    @task
+    def queue_el_st(self):
+        data = [
+            {
+                "entity": "rrpUb_pkgRequest",
+                "method": "select",
+                "privPrefix": "NOTAR",
+                "fieldList": [
+                    "ID",
+                    "miCreateDate",
+                    "reqType",
+                    "subjects",
+                    "dcTermReview",
+                    "termReviewDate",
+                    "mi_modifyDate"
+                ],
+                "options": {
+                    "limit": 30,
+                    "start": 0
+                }
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Vidkrittya chergi zayav podanish elect formi",
+                         headers=self.headers,
+                         json=data)
+
+    @task
+    def search_st_preregistration(self):
+        # Відкриття вкладки Пошук заяв на попередню реєстрацію
+        self.client.post("/ubql", name=self.class_name + " (DRRP)Vidkrittya poshuk zayav prev reestratsii",
+                         headers=self.headers,
+                         json=erc_objects_names_atu)
+
+        # Пошук заяв на попередню реєстрацію
+        data = [
+            {
+                "entity": "rrpUb_requestCard",
+                "method": "searchRequestPreRegistration",
+                "searchParams": {
+                    "reqStartDate": get_date_strftime("%Y-%m-%dT%H-2:%M:%S.000Z", 10),
+                    "reqFinishDate": get_now_strftime("%Y-%m-%dT%H-2:%M:%S.000Z"),
+                    "holderObjId": 22061,
+                    "dcHolderType": 914,
+                    "holderAtuId": 10,
+                    "privCode": "NOTAR_PREV_REQ_OPERATIONS_SEARCH"
+                }
+            }
+        ]
+        self.client.post("/ubql",
+                         name=self.class_name + " (DRRP)poshuk zayav prev reestratsii(searchRequestPreRegistration)",
+                         headers=self.headers,
+                         json=data)
+
+    # -- Сутності які викликаються при авторизації
+    @task()
+    def auth_ubs_settings(self):
+        data = [
+            {
+                "entity": "ubs_settings",
+                "method": "select",
+                "fieldList": [
+                    "ID",
+                    "settingKey",
+                    "name",
+                    "description",
+                    "type",
+                    "settingValue",
+                    "defaultValue"
+                ],
+                "version": "166"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)ubs_settings", headers=self.headers, json=data)
+
+    def auth_ubm_form_ubm_enum(self):
+        data = [
+            {
+                "entity": "ubm_enum",
+                "method": "select",
+                "fieldList": [
+                    "eGroup",
+                    "code",
+                    "name",
+                    "shortName",
+                    "sortOrder",
+                    "ID",
+                    "mi_modifyDate"
+                ],
+                "version": "251207"
+            },
+            {
+                "entity": "ubm_form",
+                "method": "select",
+                "fieldList": [
+                    "ID",
+                    "code",
+                    "description",
+                    "caption",
+                    "formType",
+                    "formDef",
+                    "formCode",
+                    "entity",
+                    "model",
+                    "isDefault"
+                ],
+                "version": 803741496
+            },
+            {
+                "entity": "ubm_enum",
+                "method": "select",
+                "fieldList": [
+                    "ID",
+                    "eGroup",
+                    "code",
+                    "name",
+                    "shortName",
+                    "sortOrder",
+                    "mi_modifyDate"
+                ],
+                "version": "251207"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)ubm_form ubm_enum", headers=self.headers, json=data)
+
+    def auth_ubm_navshortcut(self):
+        data = [
+            {
+                "entity": "ubm_navshortcut",
+                "method": "select",
+                "fieldList": [
+                    "ID",
+                    "desktopID",
+                    "parentID",
+                    "code",
+                    "isFolder",
+                    "caption",
+                    "inWindow",
+                    "isCollapsed",
+                    "displayOrder",
+                    "iconCls",
+                    "description",
+                    "mi_modifyDate"
+                ],
+                "orderList": {
+                    "0": {
+                        "expression": "desktopID",
+                        "order": "asc"
+                    },
+                    "1": {
+                        "expression": "parentID",
+                        "order": "asc"
+                    },
+                    "2": {
+                        "expression": "displayOrder",
+                        "order": "asc"
+                    },
+                    "3": {
+                        "expression": "caption",
+                        "order": "asc"
+                    }
+                }
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)ubm_navshortcut", headers=self.headers, json=data)
+
+    def auth_ubae_enum_adm(self):
+        data = [
+            {
+                "entity": "ubaE_enum_adm",
+                "method": "selectAllowedEnums"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)ubaE_enum_adm(selectAllowedEnums)",
+                         headers=self.headers, json=data)
+
+    def auth_rrpcore_dictreservedwords(self):
+        data = [
+            {
+                "entity": "rrpCore_dictReservedWords",
+                "method": "selectValidator"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)rrpCore_dictReservedWords(selectValidator)",
+                         headers=self.headers, json=data)
+
+    def auth_rstcore_dict(self):
+        data = [
+            {
+                "entity": "rstCore_dict",
+                "method": "selectForClient"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)rstCore_dict(selectForClient)",
+                         headers=self.headers, json=data)
+
+    def auth_rrpcore_dictenum(self):
+        data = [
+            {
+                "entity": "rrpCore_dictEnum",
+                "method": "select",
+                "fieldList": [
+                    "eGroup"
+                ]
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)rrpCore_dictEnum", headers=self.headers, json=data)
+
+    def auth_ubm_navshortcut_ubs_message(self):
+        data = [
+            {
+                "entity": "ubm_navshortcut",
+                "method": "select",
+                "fieldList": [
+                    "ID",
+                    "desktopID",
+                    "parentID",
+                    "code",
+                    "isFolder",
+                    "caption",
+                    "inWindow",
+                    "isCollapsed",
+                    "displayOrder",
+                    "iconCls",
+                    "description"
+                ],
+                "orderList": {
+                    "0": {
+                        "expression": "desktopID",
+                        "order": "asc"
+                    },
+                    "1": {
+                        "expression": "parentID",
+                        "order": "asc"
+                    },
+                    "2": {
+                        "expression": "displayOrder",
+                        "order": "asc"
+                    },
+                    "3": {
+                        "expression": "caption",
+                        "order": "asc"
+                    }
+                }
+            },
+            {
+                "entity": "ubs_message",
+                "method": "getCached",
+                "fieldList": [
+                    "ID",
+                    "messageBody",
+                    "messageType",
+                    "startDate",
+                    "expireDate",
+                    "recipients.acceptDate"
+                ],
+                "whereList": {
+                    "c1": {
+                        "expression": "[recipients.acceptDate]",
+                        "condition": "isNull"
+                    }
+                },
+                "orderList": {
+                    "0": {
+                        "expression": "startDate",
+                        "order": "desc"
+                    }
+                }
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)ubm_navshortcut, ubs_message", headers=self.headers,
+                         json=data)
+
+    def auth_ubm_enum_ubm_desktop(self):
+        data = [
+            {
+                "entity": "ubm_enum",
+                "method": "select",
+                "fieldList": [
+                    "ID",
+                    "eGroup",
+                    "code",
+                    "name",
+                    "sortOrder"
+                ],
+                "version": "251207"
+            },
+            {
+                "entity": "ubm_desktop",
+                "method": "select",
+                "fieldList": [
+                    "ID",
+                    "caption",
+                    "description",
+                    "iconCls",
+                    "isDefault",
+                    "displayOrder"
+                ],
+                "version": "-1"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)ubm_enum, ubm_desktop", headers=self.headers,
+                         json=data)
+
+    def auth_rrp_core_dict_enum(self):
+        self.client.post("/ubql", name=self.class_name + " (DRRP)rrpCore_dictEnum", headers=self.headers,
+                         json=rrp_core_dict_enum)
+
+    # Пошук сертифіката
+    def search_certificate(self):
+        data = [
+            {
+                "entity": "rrpDoc_certificateCard",
+                "method": "search",
+                "searchParams": {
+                    "dcDocTypes": "\"6\"",
+                    "series": "САК",
+                    "num": "614544",
+                    "isSimpleSearch": True
+                }
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)poshuk sertifikata(rrpDoc_certificateCard)",
+                         headers=self.headers,
+                         json=data)
+
+    def erc_dict_countries(self):
+        data = [
+            {
+                "entity": "erc_dict_countries",
+                "method": "select",
+                "fieldList": [
+                    "ID",
+                    "name",
+                    "nameSearch"
+                ],
+                "whereList": {
+                    "isActual": {
+                        "expression": "[isActual]",
+                        "condition": "equal",
+                        "values": {
+                            "isActual": 1
+                        }
+                    },
+                    "byDefaultValue": {
+                        "expression": "[ID]",
+                        "condition": "equal",
+                        "value": 225
+                    }
+                },
+                "orderList": {
+                    "byName": {
+                        "expression": "[sortOrder]",
+                        "order": "asc"
+                    }
+                }
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)erc_dict_countries)",
+                         headers=self.headers,
+                         json=data)
+
+    def exchange_edr(self):
+        data = [
+            {
+                "entity": "rrpExch_edr",
+                "method": "getSubjects",
+                "code": str(self.sbj_comp_code_list),
+                "dcEntityType": "1"
+            }
+        ]
+        self.client.post("/ubql", name=self.class_name + " (DRRP)obmin edr",
+                         headers=self.headers,
+                         json=data)
