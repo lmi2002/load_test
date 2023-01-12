@@ -42,7 +42,7 @@ def ask_user():
 # get last 30 days of data
 def get_last_30_days():
     # Prometheus query maximum number of sessions in last 30 days during 1 minute
-    promql_max = {'query': 'avg by (job) (max_over_time(unitybase_sessions_total[30d:1m]))'}
+    promql_max = {'query': 'max by (job) (max_over_time(unitybase_sessions_total[30d:1m]))'}
     # Prometheus query average number of sessions in last 30 days during 1 minute
     promql_avg = {'query': 'avg by (job) (avg_over_time(unitybase_sessions_total[30d:1m]))'}
 
@@ -72,15 +72,15 @@ def get_last_30_days():
 
     # Prometheus count of queries to methods in last 30 days
     promql_count = {
-        'query': 'topk(1000, sort_desc(sum by (job, entity, method) (sum_over_time(unitybase_method_duration_seconds_count[30d]))))'}
+        'query': 'topk(1000, sort_desc(sum by (job, entity, method) (increase(unitybase_method_duration_seconds_count[30d]))))'}
     # Prometheus average duration of queries to methods in last 30 days
     promql_avg = {'query': '''topk(1000, sort_desc(
   avg by(job, entity, method) (
-        sum_over_time(
+        rate(
           unitybase_method_duration_seconds_sum[30d]
         )
       /
-        sum_over_time(
+        rate(
           unitybase_method_duration_seconds_count[30d]
         )
   )))'''}
@@ -170,17 +170,21 @@ def get_date_range():
     end_date = input("Enter end date (yyyy-mm-dd): ")
     # days between start and end date
     days = (datetime.datetime.strptime(end_date, "%Y-%m-%d") - datetime.datetime.strptime(start_date, "%Y-%m-%d")).days
+    # check if days is equal 0 display error message
+    if days == 0:
+        print("Start date and end date can't be the same. Please try again.")
+        get_date_range()
     # offset between start date and today
     offset = (datetime.datetime.today() - datetime.datetime.strptime(start_date, "%Y-%m-%d")).days
-    # convert dates to unix time
-    start_date_unix = int(datetime.datetime.strptime(start_date, "%Y-%m-%d").timestamp())
-    end_date_unix = int(datetime.datetime.strptime(end_date, "%Y-%m-%d").timestamp())
+    # if offset is not equal 0 create offset string else create empty string
+    if offset != 0:
+        offset = ' offset ' + str(offset) + 'd'
+    else:
+        offset = ''
     # Prometheus query maximum number of sessions in date range during 1 minute
-    promql_max = {'query': 'avg by (job) (max_over_time(unitybase_sessions_total[' + str(days) + 'd:1m] offset '
-                           + str(offset) + 'd))'}
+    promql_max = {'query': 'max by (job) (max_over_time(unitybase_sessions_total[' + str(days) + 'd:1m]' + offset + '))'}
     # Prometheus query average number of sessions in date range during 1 minute
-    promql_avg = {'query': 'avg by (job) (avg_over_time(unitybase_sessions_total[' + str(days) + 'd:1m] offset '
-                           + str(offset) + 'd))'}
+    promql_avg = {'query': 'avg by (job) (avg_over_time(unitybase_sessions_total[' + str(days) + 'd:1m] ' + offset + '))'}
 
     print('')
     print("Unity-base maximum and average number of session during 1 minute in range " + start_date + " - " + end_date)
@@ -193,7 +197,7 @@ def get_date_range():
     r2_json = r2.json()['data']['result']
 
     rows = []
-    for result in r2_json:
+    for result in r1_json:
         l = []
         l.append(result['metric'].get('job', ''))
         try:
@@ -201,7 +205,7 @@ def get_date_range():
         except:
             l.append(0)
         # find row in r2_json with same job
-        for result2 in r1_json:
+        for result2 in r2_json:
             if result2['metric'].get('job', '') == result['metric'].get('job', ''):
                 try:
                     l.append(round(float(result2['value'][1]), 0))
@@ -214,20 +218,22 @@ def get_date_range():
 
     # Prometheus count of queries to methods in date range
     promql_count = {
-        'query': 'topk(1000, sort_desc(sum by (job, entity, method) (sum_over_time('
-                 'unitybase_method_duration_seconds_count[' + str(days) + 'd] offset ' + str(offset) + 'd))))'}
+        'query': 'topk(1000, sort_desc(sum by (job, entity, method) (increase('
+                 'unitybase_method_duration_seconds_count[' + str(days) + 'd] ' + offset + '))))'}
     # Prometheus average duration of queries to methods in date range
     promql_avg = {'query': '''topk(1000, sort_desc(
       avg by (job, entity, method)(
-        sum_over_time(unitybase_method_duration_seconds_sum[''' + str(days) + '''d] offset ''' + str(offset) + '''d)
-        / sum_over_time(unitybase_method_duration_seconds_count[''' + str(days) + '''d] offset ''' + str(offset) + '''d)
+        rate(unitybase_method_duration_seconds_sum[''' + str(days) + '''d] ''' + offset + ''')
+        / rate(unitybase_method_duration_seconds_count[''' + str(days) + '''d] ''' + offset + ''')
        )))'''}
     # Prometheus maximum duration of queries to methods in date range
     promql_max = {'query': '''topk(1000, sort_desc(
       max by (job, entity, method)(
-         max_over_time(unitybase_method_duration_seconds_sum[''' + str(days) + '''d] offset ''' + str(offset) + '''d)
-        / avg_over_time(unitybase_method_duration_seconds_count[''' + str(days) + '''d] offset ''' + str(offset) + '''d)
+         max_over_time(unitybase_method_duration_seconds_sum[''' + str(days) + '''d] ''' + offset + ''')
+        / avg_over_time(unitybase_method_duration_seconds_count[''' + str(days) + '''d] ''' + offset + ''')
         )))'''}
+
+    print(promql_avg)
 
     r1 = requests.get(url=URL, params=promql_count)
     r2 = requests.get(url=URL, params=promql_avg)
@@ -249,7 +255,7 @@ def get_date_range():
             l.append(result['metric'].get('entity', ''))
             l.append(result['metric'].get('method', ''))
             try:
-                l.append(round(float(result['value'][1])), 0)
+                l.append(round(float(result['value'][1]), 0))
             except:
                 l.append(0)
             rows.append(l)

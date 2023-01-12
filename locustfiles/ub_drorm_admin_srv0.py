@@ -6,7 +6,7 @@ from locust import FastHttpUser, task
 
 import setting_user
 import setting_header
-from data_comp_code_drorm import comp_code
+from data_comp_code import comp_code
 from data_pers_code_drorm import pers_code
 from func import get_now_strftime
 
